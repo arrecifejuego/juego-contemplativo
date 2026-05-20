@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
 
 <meta charset="UTF-8" />
@@ -25,6 +26,7 @@ html,body{
 
 canvas{
   display:block;
+  touch-action:none;
 }
 
 .overlay{
@@ -100,8 +102,31 @@ const canvas = document.getElementById("canvas");
 
 const ctx = canvas.getContext("2d");
 
-let w = canvas.width = window.innerWidth;
-let h = canvas.height = window.innerHeight;
+let w;
+let h;
+
+/* =========================
+   RESIZE
+========================= */
+
+function resizeCanvas(){
+
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+
+}
+
+window.addEventListener("resize", resizeCanvas);
+
+resizeCanvas();
+
+/* =========================
+   ONDAS
+========================= */
+
+const ripples = [];
+
+let interactions = 0;
 
 function crearOnda(x,y){
 
@@ -128,34 +153,58 @@ function crearOnda(x,y){
 
 }
 
-/* CLICK DESKTOP */
+/* =========================
+   DESKTOP
+========================= */
 
-window.addEventListener("click", e=>{
+canvas.addEventListener("click", e=>{
+
+  const rect = canvas.getBoundingClientRect();
 
   crearOnda(
-    e.clientX,
-    e.clientY
+    e.clientX - rect.left,
+    e.clientY - rect.top
   );
 
 });
 
-/* TOUCH CELULAR */
+/* =========================
+   MOBILE TOUCH
+========================= */
 
-window.addEventListener("touchstart", e=>{
+canvas.addEventListener("touchstart", e=>{
+
+  e.preventDefault();
+
+  const rect = canvas.getBoundingClientRect();
 
   const touch = e.touches[0];
 
   crearOnda(
-    touch.clientX,
-    touch.clientY
+    touch.clientX - rect.left,
+    touch.clientY - rect.top
   );
 
-},{ passive:true });
+}, { passive:false });
 
-  w = canvas.width = window.innerWidth;
-  h = canvas.height = window.innerHeight;
+/* =========================
+   MOBILE DRAG
+========================= */
 
-});
+canvas.addEventListener("touchmove", e=>{
+
+  e.preventDefault();
+
+  const rect = canvas.getBoundingClientRect();
+
+  const touch = e.touches[0];
+
+  crearOnda(
+    touch.clientX - rect.left,
+    touch.clientY - rect.top
+  );
+
+}, { passive:false });
 
 /* =========================
    ORGANISMOS
@@ -169,8 +218,8 @@ for(let i=0;i<TOTAL;i++){
 
   organisms.push({
 
-    x:Math.random()*w,
-    y:Math.random()*h,
+    x:Math.random()*window.innerWidth,
+    y:Math.random()*window.innerHeight,
 
     vx:(Math.random()-0.5)*0.3,
     vy:(Math.random()-0.5)*0.3,
@@ -186,43 +235,6 @@ for(let i=0;i<TOTAL;i++){
   });
 
 }
-
-/* =========================
-   ONDAS
-========================= */
-
-const ripples = [];
-
-let interactions = 0;
-
-/* =========================
-   CLICK
-========================= */
-
-window.addEventListener("click", e=>{
-
-  interactions++;
-
-  document.getElementById("indicacion").style.opacity = "0";
-
-  ripples.push({
-
-    x:e.clientX,
-    y:e.clientY,
-
-    radius:0,
-
-    alpha:1
-
-  });
-
-  if(interactions > 6){
-
-    document.getElementById("frase").style.opacity = "0.5";
-
-  }
-
-});
 
 /* =========================
    DIBUJOS
@@ -307,6 +319,7 @@ function animate(){
   gradient.addColorStop(1,"rgba(0,0,0,1)");
 
   ctx.fillStyle = gradient;
+
   ctx.fillRect(0,0,w,h);
 
   /* Partículas suaves */
@@ -373,7 +386,7 @@ function animate(){
     if(o.y < -20) o.y = h + 20;
     if(o.y > h + 20) o.y = -20;
 
-    /* Reacción a ondas */
+    /* Reacción */
 
     ripples.forEach(r=>{
 
@@ -388,6 +401,7 @@ function animate(){
           (220 - dist) / 220;
 
         o.vx += dx/dist * 0.008 * force * o.attraction;
+
         o.vy += dy/dist * 0.008 * force * o.attraction;
 
       }
