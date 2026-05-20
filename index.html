@@ -103,7 +103,54 @@ const ctx = canvas.getContext("2d");
 let w = canvas.width = window.innerWidth;
 let h = canvas.height = window.innerHeight;
 
-window.addEventListener("resize", ()=>{
+function crearOnda(x,y){
+
+  interactions++;
+
+  document.getElementById("indicacion").style.opacity = "0";
+
+  ripples.push({
+
+    x:x,
+    y:y,
+
+    radius:0,
+
+    alpha:1
+
+  });
+
+  if(interactions > 6){
+
+    document.getElementById("frase").style.opacity = "0.5";
+
+  }
+
+}
+
+/* CLICK DESKTOP */
+
+window.addEventListener("click", e=>{
+
+  crearOnda(
+    e.clientX,
+    e.clientY
+  );
+
+});
+
+/* TOUCH CELULAR */
+
+window.addEventListener("touchstart", e=>{
+
+  const touch = e.touches[0];
+
+  crearOnda(
+    touch.clientX,
+    touch.clientY
+  );
+
+},{ passive:true });
 
   w = canvas.width = window.innerWidth;
   h = canvas.height = window.innerHeight;
