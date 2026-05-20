@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>El Mar — Arrecife</title>
+
+<style>
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#000;
+  font-family:Arial, sans-serif;
+}
+
+canvas{
+  display:block;
+}
+
+.overlay{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+}
+
+.logo{
+  position:absolute;
+  top:35px;
+  left:50%;
+  transform:translateX(-50%);
+  color:white;
+  letter-spacing:10px;
+  font-size:11px;
+  opacity:0.4;
+}
+
+.frase{
+  position:absolute;
+  bottom:45px;
+  left:50%;
+  transform:translateX(-50%);
+  color:white;
+  opacity:0;
+  font-size:13px;
+  letter-spacing:2px;
+  transition:2s;
+  text-align:center;
+  line-height:1.8;
+}
+
+.indicacion{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  color:white;
+  opacity:0.15;
+  letter-spacing:4px;
+  font-size:11px;
+  transition:2s;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="overlay">
+
+  <div class="logo">
+    ARRECIFE
+  </div>
+
+  <div class="indicacion" id="indicacion">
+    TOCÁ EL MAR
+  </div>
+
+  <div class="frase" id="frase">
+    El mar recuerda cada movimiento.
+  </div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+
+const ctx = canvas.getContext("2d");
+
+let w = canvas.width = window.innerWidth;
+let h = canvas.height = window.innerHeight;
+
+window.addEventListener("resize", ()=>{
+
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+
+});
+
+/* =========================
+   ORGANISMOS
+========================= */
+
+const organisms = [];
+
+const TOTAL = 24;
+
+for(let i=0;i<TOTAL;i++){
+
+  organisms.push({
+
+    x:Math.random()*w,
+    y:Math.random()*h,
+
+    vx:(Math.random()-0.5)*0.3,
+    vy:(Math.random()-0.5)*0.3,
+
+    size:Math.random()*12 + 6,
+
+    angle:Math.random()*Math.PI*2,
+
+    type:Math.floor(Math.random()*3),
+
+    attraction:Math.random()*0.8 + 0.2
+
+  });
+
+}
+
+/* =========================
+   ONDAS
+========================= */
+
+const ripples = [];
+
+let interactions = 0;
+
+/* =========================
+   CLICK
+========================= */
+
+window.addEventListener("click", e=>{
+
+  interactions++;
+
+  document.getElementById("indicacion").style.opacity = "0";
+
+  ripples.push({
+
+    x:e.clientX,
+    y:e.clientY,
+
+    radius:0,
+
+    alpha:1
+
+  });
+
+  if(interactions > 6){
+
+    document.getElementById("frase").style.opacity = "0.5";
+
+  }
+
+});
+
+/* =========================
+   DIBUJOS
+========================= */
+
+function drawTriangle(x,y,size,angle){
+
+  ctx.beginPath();
+
+  for(let i=0;i<3;i++){
+
+    const a = angle + i * Math.PI * 2/3;
+
+    const px = x + Math.cos(a)*size;
+    const py = y + Math.sin(a)*size;
+
+    if(i===0){
+
+      ctx.moveTo(px,py);
+
+    }else{
+
+      ctx.lineTo(px,py);
+
+    }
+
+  }
+
+  ctx.closePath();
+
+  ctx.stroke();
+
+}
+
+function drawHexagon(x,y,size,angle){
+
+  ctx.beginPath();
+
+  for(let i=0;i<6;i++){
+
+    const a = angle + i * Math.PI * 2/6;
+
+    const px = x + Math.cos(a)*size;
+    const py = y + Math.sin(a)*size;
+
+    if(i===0){
+
+      ctx.moveTo(px,py);
+
+    }else{
+
+      ctx.lineTo(px,py);
+
+    }
+
+  }
+
+  ctx.closePath();
+
+  ctx.stroke();
+
+}
+
+/* =========================
+   LOOP
+========================= */
+
+function animate(){
+
+  requestAnimationFrame(animate);
+
+  ctx.clearRect(0,0,w,h);
+
+  /* Fondo */
+
+  const gradient = ctx.createRadialGradient(
+    w/2,h/2,0,
+    w/2,h/2,w
+  );
+
+  gradient.addColorStop(0,"rgba(10,20,30,0.15)");
+  gradient.addColorStop(1,"rgba(0,0,0,1)");
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0,0,w,h);
+
+  /* Partículas suaves */
+
+  for(let i=0;i<50;i++){
+
+    ctx.fillStyle = "rgba(255,255,255,0.015)";
+
+    ctx.beginPath();
+
+    ctx.arc(
+      (i*200 + performance.now()*0.01)%w,
+      (i*97)%h,
+      1.5,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+  }
+
+  /* Ondas */
+
+  ripples.forEach((r,index)=>{
+
+    r.radius += 2.2;
+
+    r.alpha -= 0.0035;
+
+    ctx.beginPath();
+
+    ctx.arc(r.x,r.y,r.radius,0,Math.PI*2);
+
+    ctx.strokeStyle =
+      `rgba(126,231,255,${r.alpha*0.35})`;
+
+    ctx.lineWidth = 1.5;
+
+    ctx.stroke();
+
+    if(r.alpha <= 0){
+
+      ripples.splice(index,1);
+
+    }
+
+  });
+
+  /* Organismos */
+
+  organisms.forEach(o=>{
+
+    o.x += o.vx;
+    o.y += o.vy;
+
+    o.angle += 0.003;
+
+    /* Bordes */
+
+    if(o.x < -20) o.x = w + 20;
+    if(o.x > w + 20) o.x = -20;
+
+    if(o.y < -20) o.y = h + 20;
+    if(o.y > h + 20) o.y = -20;
+
+    /* Reacción a ondas */
+
+    ripples.forEach(r=>{
+
+      const dx = r.x - o.x;
+      const dy = r.y - o.y;
+
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      if(dist < 220){
+
+        const force =
+          (220 - dist) / 220;
+
+        o.vx += dx/dist * 0.008 * force * o.attraction;
+        o.vy += dy/dist * 0.008 * force * o.attraction;
+
+      }
+
+    });
+
+    /* Frenado */
+
+    o.vx *= 0.992;
+    o.vy *= 0.992;
+
+    /* Glow */
+
+    ctx.strokeStyle =
+      "rgba(126,231,255,0.25)";
+
+    ctx.lineWidth = 1;
+
+    ctx.shadowBlur = 15;
+
+    ctx.shadowColor =
+      "rgba(126,231,255,0.15)";
+
+    /* Formas */
+
+    if(o.type === 0){
+
+      drawTriangle(
+        o.x,
+        o.y,
+        o.size,
+        o.angle
+      );
+
+    }else if(o.type === 1){
+
+      drawHexagon(
+        o.x,
+        o.y,
+        o.size,
+        o.angle
+      );
+
+    }else{
+
+      ctx.beginPath();
+
+      ctx.arc(
+        o.x,
+        o.y,
+        o.size*0.7,
+        0,
+        Math.PI*2
+      );
+
+      ctx.stroke();
+
+    }
+
+  });
+
+}
+
+animate();
+
+</script>
+
+</body>
+</html>
