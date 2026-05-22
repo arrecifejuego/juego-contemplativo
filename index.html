@@ -1,627 +1,412 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
 <title>El Mar — Arrecife</title>
-
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&family=Tenor+Sans&display=swap" rel="stylesheet"/>
 <style>
-
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-}
-
-html,body{
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background:#000;
-  font-family:Arial, sans-serif;
-}
-
-canvas{
-  display:block;
-  touch-action:none;
-}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;}
+canvas{display:block;touch-action:none;}
 
 .overlay{
-  position:fixed;
-  inset:0;
+  position:fixed;inset:0;
   pointer-events:none;
 }
 
 .logo{
   position:absolute;
-  top:35px;
-  left:50%;
+  top:32px;left:50%;
   transform:translateX(-50%);
   color:white;
-  letter-spacing:10px;
-  font-size:11px;
-  opacity:0.4;
-}
-
-.frase{
-  position:absolute;
-  bottom:45px;
-  left:50%;
-  transform:translateX(-50%);
-  color:white;
-  opacity:0;
-  font-size:13px;
-  letter-spacing:2px;
-  transition:2s;
-  text-align:center;
-  line-height:1.8;
+  font-family:'Tenor Sans',sans-serif;
+  letter-spacing:10px;font-size:10px;
+  opacity:0.3;
+  text-transform:uppercase;
 }
 
 .indicacion{
   position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%, -50%);
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
   color:white;
-  opacity:0.15;
-  letter-spacing:4px;
-  font-size:11px;
-  transition:2s;
+  font-family:'Cormorant Garamond',serif;
+  font-style:italic;
+  font-weight:300;
+  opacity:0.2;
+  letter-spacing:3px;
+  font-size:14px;
+  transition:opacity 2.5s ease;
 }
 
+.frase{
+  position:absolute;
+  bottom:50px;left:50%;
+  transform:translateX(-50%);
+  color:white;
+  font-family:'Cormorant Garamond',serif;
+  font-style:italic;
+  font-weight:300;
+  font-size:14px;
+  letter-spacing:1.5px;
+  line-height:1.9;
+  text-align:center;
+  opacity:0;
+  width:420px;
+  max-width:90vw;
+  transition:opacity 2s ease;
+  pointer-events:none;
+}
 </style>
-
 </head>
-
 <body>
 
 <canvas id="canvas"></canvas>
 
 <div class="overlay">
-
-  <div class="logo">
-    ARRECIFE
-  </div>
-
-  <div class="indicacion" id="indicacion">
-    TOCÁ EL MAR
-  </div>
-
-  <div class="frase" id="frase">
-    El mar recuerda cada movimiento.
-  </div>
-
+  <div class="logo">Arrecife</div>
+  <div class="indicacion" id="indicacion">tocá el mar</div>
+  <div class="frase" id="frase"></div>
 </div>
 
 <script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let w, h;
 
-const canvas = document.getElementById("canvas");
+/* ============================
+   FRASES
+============================ */
+const frases = [
+  "El mar recuerda cada movimiento.",
+  "Todo lo que hacés\nva a ser interpretado.",
+  "No hay conflicto\nsi todos están del mismo lado.",
+  "Algo se equilibra…\naunque sea por un instante.",
+  "Nadie es el mismo\ndespués de lo que vio.",
+  "No siempre el grupo más grande\nestá en ventaja.",
+  "El daño nunca se pierde.\nSiempre vuelve.",
+  "En este mar, sobrevive\nquien mejor interpreta a los demás."
+];
 
-const ctx = canvas.getContext("2d");
+let fraseIndex = 0;
+let fraseVisible = false;
+let interactions = 0;
+const fraseEl = document.getElementById('frase');
+const indicacionEl = document.getElementById('indicacion');
 
-let w;
-let h;
+function mostrarFrase(){
+  fraseEl.style.opacity = '0';
+  setTimeout(()=>{
+    fraseEl.textContent = frases[fraseIndex % frases.length].replace(/\n/g,' ');
+    // saltos de línea
+    fraseEl.innerHTML = frases[fraseIndex % frases.length]
+      .split('\n')
+      .map(l=>`<span style="display:block">${l}</span>`)
+      .join('');
+    fraseEl.style.opacity = '0.45';
+    fraseIndex++;
+  }, 600);
+}
 
-/* =========================
+/* ============================
    AUDIO
-========================= */
-
-let audioStarted = false;
-
-const audioCtx =
-  new (window.AudioContext || window.webkitAudioContext)();
+============================ */
+const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
 
 function playOceanSound(x,y){
-
-  if(audioCtx.state === "suspended"){
-    audioCtx.resume();
-  }
-
+  if(audioCtx.state==='suspended') audioCtx.resume();
   const now = audioCtx.currentTime;
+  const pitch = 110 + Math.random()*90;
 
-  /* tono principal */
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  osc.type='sine';
+  osc.frequency.setValueAtTime(pitch,now);
+  filter.type='lowpass';
+  filter.frequency.value=480;
+  gain.gain.setValueAtTime(0,now);
+  gain.gain.linearRampToValueAtTime(0.028,now+0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001,now+2);
+  osc.connect(filter);filter.connect(gain);gain.connect(audioCtx.destination);
+  osc.start(now);osc.stop(now+2);
 
-  const osc =
-    audioCtx.createOscillator();
-
-  const gain =
-    audioCtx.createGain();
-
-  const filter =
-    audioCtx.createBiquadFilter();
-
-  osc.type = "sine";
-
-  const randomPitch =
-    120 + Math.random()*80;
-
-  osc.frequency.setValueAtTime(
-    randomPitch,
-    now
-  );
-
-  filter.type = "lowpass";
-
-  filter.frequency.value = 500;
-
-  gain.gain.setValueAtTime(0, now);
-
-  gain.gain.linearRampToValueAtTime(
-    0.03,
-    now + 0.02
-  );
-
-  gain.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + 1.8
-  );
-
-  osc.connect(filter);
-  filter.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc.start(now);
-  osc.stop(now + 1.8);
-
-  /* eco suave */
-
-  const osc2 =
-    audioCtx.createOscillator();
-
-  const gain2 =
-    audioCtx.createGain();
-
-  osc2.type = "triangle";
-
-  osc2.frequency.value =
-    randomPitch * 0.5;
-
-  gain2.gain.setValueAtTime(
-    0,
-    now
-  );
-
-  gain2.gain.linearRampToValueAtTime(
-    0.015,
-    now + 0.15
-  );
-
-  gain2.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + 3
-  );
-
-  osc2.connect(gain2);
-  gain2.connect(audioCtx.destination);
-
-  osc2.start(now);
-  osc2.stop(now + 3);
-
+  const osc2=audioCtx.createOscillator();
+  const gain2=audioCtx.createGain();
+  osc2.type='triangle';
+  osc2.frequency.value=pitch*0.502;
+  gain2.gain.setValueAtTime(0,now);
+  gain2.gain.linearRampToValueAtTime(0.012,now+0.18);
+  gain2.gain.exponentialRampToValueAtTime(0.0001,now+3.2);
+  osc2.connect(gain2);gain2.connect(audioCtx.destination);
+  osc2.start(now);osc2.stop(now+3.2);
 }
-
-/* =========================
-   BALLENA LEJANA
-========================= */
 
 function whaleSound(){
-
-  if(audioCtx.state === "suspended"){
-    return;
-  }
-
-  const now = audioCtx.currentTime;
-
-  const osc =
-    audioCtx.createOscillator();
-
-  const gain =
-    audioCtx.createGain();
-
-  osc.type = "sine";
-
-  osc.frequency.setValueAtTime(
-    80,
-    now
-  );
-
-  osc.frequency.linearRampToValueAtTime(
-    40,
-    now + 4
-  );
-
-  gain.gain.setValueAtTime(
-    0,
-    now
-  );
-
-  gain.gain.linearRampToValueAtTime(
-    0.01,
-    now + 1
-  );
-
-  gain.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + 5
-  );
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc.start(now);
-  osc.stop(now + 5);
-
+  if(audioCtx.state==='suspended') return;
+  const now=audioCtx.currentTime;
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  osc.type='sine';
+  osc.frequency.setValueAtTime(75,now);
+  osc.frequency.linearRampToValueAtTime(38,now+4.5);
+  gain.gain.setValueAtTime(0,now);
+  gain.gain.linearRampToValueAtTime(0.009,now+1.2);
+  gain.gain.exponentialRampToValueAtTime(0.0001,now+5.5);
+  osc.connect(gain);gain.connect(audioCtx.destination);
+  osc.start(now);osc.stop(now+5.5);
 }
 
-/* sonido ocasional */
+setInterval(()=>{ if(Math.random()>0.6) whaleSound(); },20000);
 
-setInterval(()=>{
-
-  if(Math.random() > 0.65){
-
-    whaleSound();
-
-  }
-
-}, 18000);
-
-/* =========================
+/* ============================
    RESIZE
-========================= */
-
-function resizeCanvas(){
-
-  w = canvas.width = window.innerWidth;
-  h = canvas.height = window.innerHeight;
-
+============================ */
+function resize(){
+  w=canvas.width=window.innerWidth;
+  h=canvas.height=window.innerHeight;
 }
+window.addEventListener('resize',resize);
+resize();
 
-window.addEventListener("resize", resizeCanvas);
-
-resizeCanvas();
-
-/* =========================
+/* ============================
    ONDAS
-========================= */
-
-const ripples = [];
-
-let interactions = 0;
+============================ */
+const ripples=[];
 
 function crearOnda(x,y){
-
   interactions++;
-
-  document.getElementById("indicacion").style.opacity = "0";
-
-  ripples.push({
-
-    x:x,
-    y:y,
-
-    radius:0,
-
-    alpha:1
-
-  });
-
+  if(interactions===1){
+    indicacionEl.style.opacity='0';
+  }
+  // nueva frase cada 5 interacciones
+  if(interactions===5 || (interactions>5 && (interactions-5)%8===0)){
+    mostrarFrase();
+  }
+  ripples.push({x,y,radius:0,alpha:0.9,speed:1.8+Math.random()*0.8});
+  // segunda onda pequeña desfasada
+  setTimeout(()=>{
+    ripples.push({x,y,radius:0,alpha:0.45,speed:1.4+Math.random()*0.5});
+  },180);
   playOceanSound(x,y);
-
-  if(interactions > 6){
-
-    document.getElementById("frase").style.opacity = "0.5";
-
-  }
-
 }
 
-/* =========================
-   DESKTOP
-========================= */
-
-canvas.addEventListener("click", e=>{
-
-  const rect = canvas.getBoundingClientRect();
-
-  crearOnda(
-    e.clientX - rect.left,
-    e.clientY - rect.top
-  );
-
+canvas.addEventListener('click',e=>{
+  const r=canvas.getBoundingClientRect();
+  crearOnda(e.clientX-r.left,e.clientY-r.top);
 });
-
-/* =========================
-   MOBILE TOUCH
-========================= */
-
-canvas.addEventListener("touchstart", e=>{
-
+canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
-
-  const rect = canvas.getBoundingClientRect();
-
-  const touch = e.touches[0];
-
-  crearOnda(
-    touch.clientX - rect.left,
-    touch.clientY - rect.top
-  );
-
-}, { passive:false });
-
-/* =========================
-   MOBILE DRAG
-========================= */
-
-canvas.addEventListener("touchmove", e=>{
-
+  const r=canvas.getBoundingClientRect();
+  crearOnda(e.touches[0].clientX-r.left,e.touches[0].clientY-r.top);
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
   e.preventDefault();
+  const r=canvas.getBoundingClientRect();
+  crearOnda(e.touches[0].clientX-r.left,e.touches[0].clientY-r.top);
+},{passive:false});
 
-  const rect = canvas.getBoundingClientRect();
-
-  const touch = e.touches[0];
-
-  crearOnda(
-    touch.clientX - rect.left,
-    touch.clientY - rect.top
-  );
-
-}, { passive:false });
-
-/* =========================
-   ORGANISMOS
-========================= */
-
-const organisms = [];
-
-const TOTAL = 24;
-
-for(let i=0;i<TOTAL;i++){
-
-  organisms.push({
-
-    x:Math.random()*window.innerWidth,
-    y:Math.random()*window.innerHeight,
-
-    vx:(Math.random()-0.5)*0.3,
-    vy:(Math.random()-0.5)*0.3,
-
-    size:Math.random()*12 + 6,
-
-    angle:Math.random()*Math.PI*2,
-
-    type:Math.floor(Math.random()*3),
-
-    attraction:Math.random()*0.8 + 0.2
-
-  });
-
-}
-
-/* =========================
-   DIBUJOS
-========================= */
-
-function drawTriangle(x,y,size,angle){
-
-  ctx.beginPath();
-
-  for(let i=0;i<3;i++){
-
-    const a = angle + i * Math.PI * 2/3;
-
-    const px = x + Math.cos(a)*size;
-    const py = y + Math.sin(a)*size;
-
-    if(i===0){
-
-      ctx.moveTo(px,py);
-
-    }else{
-
-      ctx.lineTo(px,py);
-
-    }
-
+/* ============================
+   CRIATURAS ORGÁNICAS
+============================ */
+class Criatura {
+  constructor(){
+    this.reset(true);
   }
-
-  ctx.closePath();
-
-  ctx.stroke();
-
-}
-
-function drawHexagon(x,y,size,angle){
-
-  ctx.beginPath();
-
-  for(let i=0;i<6;i++){
-
-    const a = angle + i * Math.PI * 2/6;
-
-    const px = x + Math.cos(a)*size;
-    const py = y + Math.sin(a)*size;
-
-    if(i===0){
-
-      ctx.moveTo(px,py);
-
-    }else{
-
-      ctx.lineTo(px,py);
-
+  reset(init){
+    this.x = Math.random()*w;
+    this.y = init ? Math.random()*h : (Math.random()<0.5 ? -30 : h+30);
+    this.baseSpeed = Math.random()*0.35+0.08;
+    this.angle = Math.random()*Math.PI*2;
+    this.targetAngle = this.angle;
+    this.speed = this.baseSpeed;
+    this.segments = Math.floor(Math.random()*4)+5; // 5-8 segmentos
+    this.segLen = Math.random()*7+5;
+    this.thickness = Math.random()*1.8+0.6;
+    this.opacity = Math.random()*0.22+0.08;
+    this.wave = Math.random()*Math.PI*2;
+    this.waveSpeed = Math.random()*0.025+0.01;
+    this.waveAmp = Math.random()*0.55+0.2;
+    this.scared = false;
+    this.scaredTimer = 0;
+    this.attraction = Math.random()*0.6+0.2;
+    // historial de posiciones para el cuerpo
+    this.history = [];
+    for(let i=0;i<this.segments+1;i++){
+      this.history.push({x:this.x, y:this.y});
     }
-
   }
+  update(){
+    this.wave += this.waveSpeed;
 
-  ctx.closePath();
-
-  ctx.stroke();
-
-}
-
-/* =========================
-   LOOP
-========================= */
-
-function animate(){
-
-  requestAnimationFrame(animate);
-
-  ctx.clearRect(0,0,w,h);
-
-  /* Fondo */
-
-  const gradient = ctx.createRadialGradient(
-    w/2,h/2,0,
-    w/2,h/2,w
-  );
-
-  gradient.addColorStop(0,"rgba(10,20,30,0.15)");
-  gradient.addColorStop(1,"rgba(0,0,0,1)");
-
-  ctx.fillStyle = gradient;
-
-  ctx.fillRect(0,0,w,h);
-
-  /* Partículas suaves */
-
-  for(let i=0;i<50;i++){
-
-    ctx.fillStyle = "rgba(255,255,255,0.015)";
-
-    ctx.beginPath();
-
-    ctx.arc(
-      (i*200 + performance.now()*0.01)%w,
-      (i*97)%h,
-      1.5,
-      0,
-      Math.PI*2
-    );
-
-    ctx.fill();
-
-  }
-
-  /* Ondas */
-
-  ripples.forEach((r,index)=>{
-
-    r.radius += 2.2;
-
-    r.alpha -= 0.0035;
-
-    ctx.beginPath();
-
-    ctx.arc(r.x,r.y,r.radius,0,Math.PI*2);
-
-    ctx.strokeStyle =
-      `rgba(126,231,255,${r.alpha*0.35})`;
-
-    ctx.lineWidth = 1.5;
-
-    ctx.stroke();
-
-    if(r.alpha <= 0){
-
-      ripples.splice(index,1);
-
-    }
-
-  });
-
-  /* Organismos */
-
-  organisms.forEach(o=>{
-
-    o.x += o.vx;
-    o.y += o.vy;
-
-    o.angle += 0.003;
-
-    if(o.x < -20) o.x = w + 20;
-    if(o.x > w + 20) o.x = -20;
-
-    if(o.y < -20) o.y = h + 20;
-    if(o.y > h + 20) o.y = -20;
-
+    // reaccion a ondas
+    this.scared = false;
     ripples.forEach(r=>{
-
-      const dx = r.x - o.x;
-      const dy = r.y - o.y;
-
-      const dist = Math.sqrt(dx*dx + dy*dy);
-
-      if(dist < 220){
-
-        const force =
-          (220 - dist) / 220;
-
-        o.vx += dx/dist * 0.008 * force * o.attraction;
-
-        o.vy += dy/dist * 0.008 * force * o.attraction;
-
+      const dx=r.x-this.x, dy=r.y-this.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<200 && dist>0){
+        const force=(200-dist)/200;
+        if(dist<r.radius+20 && dist>r.radius-20){
+          // la onda los toca — huyen brevemente
+          this.targetAngle = Math.atan2(-dy,-dx)+( Math.random()-0.5)*1.2;
+          this.speed = this.baseSpeed*3.5;
+          this.scared=true;
+          this.scaredTimer=60;
+        } else if(!this.scared){
+          // atracción lenta hacia el origen de la onda
+          const attract = Math.atan2(dy,dx);
+          this.targetAngle += (attract - this.targetAngle)*0.004*force*this.attraction;
+        }
       }
-
     });
 
-    o.vx *= 0.992;
-    o.vy *= 0.992;
-
-    ctx.strokeStyle =
-      "rgba(126,231,255,0.28)";
-
-    ctx.lineWidth = 1;
-
-    ctx.shadowBlur = 15;
-
-    ctx.shadowColor =
-      "rgba(126,231,255,0.15)";
-
-    if(o.type === 0){
-
-      drawTriangle(
-        o.x,
-        o.y,
-        o.size,
-        o.angle
-      );
-
-    }else if(o.type === 1){
-
-      drawHexagon(
-        o.x,
-        o.y,
-        o.size,
-        o.angle
-      );
-
-    }else{
-
-      ctx.beginPath();
-
-      ctx.arc(
-        o.x,
-        o.y,
-        o.size*0.7,
-        0,
-        Math.PI*2
-      );
-
-      ctx.stroke();
-
+    if(this.scaredTimer>0){
+      this.scaredTimer--;
+      if(this.scaredTimer===0) this.speed=this.baseSpeed;
     }
 
+    // giro suave hacia targetAngle
+    let diff = this.targetAngle - this.angle;
+    while(diff>Math.PI) diff-=Math.PI*2;
+    while(diff<-Math.PI) diff+=Math.PI*2;
+    this.angle += diff*0.04;
+
+    // movimiento con ondulación natural
+    const nx = this.x + Math.cos(this.angle)*this.speed;
+    const ny = this.y + Math.sin(this.angle)*this.speed;
+
+    // deriva aleatoria suave
+    if(!this.scared && Math.random()<0.015){
+      this.targetAngle += (Math.random()-0.5)*1.0;
+    }
+
+    this.x = nx;
+    this.y = ny;
+
+    // rebote suave en bordes
+    const margin=40;
+    if(this.x<margin) this.targetAngle += 0.08;
+    if(this.x>w-margin) this.targetAngle -= 0.08;
+    if(this.y<margin) this.targetAngle += 0.08;
+    if(this.y>h-margin) this.targetAngle -= 0.08;
+
+    // historial para el cuerpo ondulante
+    this.history.unshift({x:this.x, y:this.y});
+    if(this.history.length>this.segments+1) this.history.pop();
+  }
+
+  draw(){
+    if(this.history.length<2) return;
+
+    ctx.save();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = `rgba(100,210,230,${this.opacity*0.5})`;
+
+    for(let i=0;i<this.history.length-1;i++){
+      const p1=this.history[i];
+      const p2=this.history[i+1];
+      const t=i/(this.history.length-1);
+
+      // ondulación lateral del cuerpo
+      const waveOffset = Math.sin(this.wave - i*0.7)*this.waveAmp*(1-t*0.5);
+      const perpX=-Math.sin(this.angle)*waveOffset;
+      const perpY= Math.cos(this.angle)*waveOffset;
+
+      const x1=p1.x+perpX*(1-t);
+      const y1=p1.y+perpY*(1-t);
+      const x2=p2.x+perpX*(1-t)*0.85;
+      const y2=p2.y+perpY*(1-t)*0.85;
+
+      // grosor que adelgaza hacia la cola
+      const thick = this.thickness*(1-t*0.75);
+      const alpha = this.opacity*(1-t*0.6);
+
+      ctx.beginPath();
+      ctx.moveTo(x1,y1);
+      ctx.lineTo(x2,y2);
+      ctx.strokeStyle=`rgba(100,210,230,${alpha})`;
+      ctx.lineWidth=thick;
+      ctx.lineCap='round';
+      ctx.stroke();
+    }
+
+    // cabeza — punto luminoso
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.thickness*0.8, 0, Math.PI*2);
+    ctx.fillStyle=`rgba(140,225,240,${this.opacity*1.4})`;
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+const criaturas=[];
+for(let i=0;i<28;i++) criaturas.push(new Criatura());
+
+/* ============================
+   LOOP
+============================ */
+function animate(){
+  requestAnimationFrame(animate);
+  ctx.clearRect(0,0,w,h);
+
+  // fondo gradiente
+  const grad=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w*0.85);
+  grad.addColorStop(0,'rgba(8,18,28,0.18)');
+  grad.addColorStop(1,'rgba(0,0,0,1)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,w,h);
+
+  // partículas de fondo
+  const t=performance.now()*0.0001;
+  for(let i=0;i<60;i++){
+    const px=((i*173+t*8)%1)*w;
+    const py=((i*97+t*4)%1)*h;
+    ctx.fillStyle='rgba(255,255,255,0.018)';
+    ctx.beginPath();
+    ctx.arc(px,py,0.9,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  // ondas — con intersección
+  ripples.forEach((r,i)=>{
+    r.radius+=r.speed;
+    r.alpha-=0.003;
+
+    // intersección con otras ondas
+    ripples.forEach((r2,j)=>{
+      if(i===j) return;
+      const dx=r.x-r2.x, dy=r.y-r2.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(Math.abs(r.radius+r2.radius-dist)<6){
+        // destello en punto de intersección
+        const ix=r.x+(r2.x-r.x)*0.5;
+        const iy=r.y+(r2.y-r.y)*0.5;
+        ctx.beginPath();
+        ctx.arc(ix,iy,3,0,Math.PI*2);
+        ctx.fillStyle=`rgba(180,240,255,${r.alpha*0.4})`;
+        ctx.fill();
+      }
+    });
+
+    ctx.beginPath();
+    ctx.arc(r.x,r.y,r.radius,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(100,210,230,${r.alpha*0.3})`;
+    ctx.lineWidth=1.2;
+    ctx.stroke();
   });
 
+  // limpiar ondas muertas
+  for(let i=ripples.length-1;i>=0;i--){
+    if(ripples[i].alpha<=0) ripples.splice(i,1);
+  }
+
+  // criaturas
+  criaturas.forEach(c=>{c.update();c.draw();});
 }
 
 animate();
-
 </script>
-
 </body>
 </html>
