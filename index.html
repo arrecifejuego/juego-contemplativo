@@ -9,67 +9,42 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{width:100%;height:100%;overflow:hidden;background:#000;}
 canvas{display:block;touch-action:none;}
-
-.overlay{
-  position:fixed;inset:0;
+.overlay{position:fixed;inset:0;pointer-events:none;}
+.logo{
+  position:absolute;top:32px;left:50%;
+  transform:translateX(-50%);
+  color:white;font-family:'Tenor Sans',sans-serif;
+  letter-spacing:10px;font-size:10px;opacity:0.25;text-transform:uppercase;
+}
+.indicacion{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  color:white;font-family:'Cormorant Garamond',serif;
+  font-style:italic;font-weight:300;
+  opacity:0.18;letter-spacing:3px;font-size:15px;
+  transition:opacity 3s ease;text-align:center;
   pointer-events:none;
 }
-
-.logo{
-  position:absolute;
-  top:32px;left:50%;
-  transform:translateX(-50%);
-  color:white;
-  font-family:'Tenor Sans',sans-serif;
-  letter-spacing:10px;font-size:10px;
-  opacity:0.3;
-  text-transform:uppercase;
-}
-
-.indicacion{
-  position:absolute;
-  top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  color:white;
-  font-family:'Cormorant Garamond',serif;
-  font-style:italic;
-  font-weight:300;
-  opacity:0.2;
-  letter-spacing:3px;
-  font-size:14px;
-  transition:opacity 2.5s ease;
-}
-
 .frase{
-  position:absolute;
-  bottom:50px;left:50%;
+  position:absolute;bottom:52px;left:50%;
   transform:translateX(-50%);
-  color:white;
-  font-family:'Cormorant Garamond',serif;
-  font-style:italic;
-  font-weight:300;
-  font-size:14px;
-  letter-spacing:1.5px;
-  line-height:1.9;
-  text-align:center;
-  opacity:0;
-  width:420px;
-  max-width:90vw;
-  transition:opacity 2s ease;
+  color:white;font-family:'Cormorant Garamond',serif;
+  font-style:italic;font-weight:300;
+  font-size:14px;letter-spacing:1.5px;line-height:2;
+  text-align:center;opacity:0;
+  width:440px;max-width:88vw;
+  transition:opacity 1.8s ease;
   pointer-events:none;
 }
 </style>
 </head>
 <body>
-
 <canvas id="canvas"></canvas>
-
 <div class="overlay">
   <div class="logo">Arrecife</div>
   <div class="indicacion" id="indicacion">tocá el mar</div>
   <div class="frase" id="frase"></div>
 </div>
-
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -88,322 +63,408 @@ const frases = [
   "El daño nunca se pierde.\nSiempre vuelve.",
   "En este mar, sobrevive\nquien mejor interpreta a los demás."
 ];
-
 let fraseIndex = 0;
-let fraseVisible = false;
-let interactions = 0;
+let fraseTimeout = null;
 const fraseEl = document.getElementById('frase');
 const indicacionEl = document.getElementById('indicacion');
+let interactions = 0;
+let ultimaFrase = 0;
+const FRASE_COOLDOWN = 7000; // ms mínimo entre frases
 
-function mostrarFrase(){
+function mostrarFrase() {
+  const ahora = Date.now();
+  if (ahora - ultimaFrase < FRASE_COOLDOWN) return;
+  ultimaFrase = ahora;
   fraseEl.style.opacity = '0';
-  setTimeout(()=>{
-    fraseEl.textContent = frases[fraseIndex % frases.length].replace(/\n/g,' ');
-    // saltos de línea
-    fraseEl.innerHTML = frases[fraseIndex % frases.length]
-      .split('\n')
-      .map(l=>`<span style="display:block">${l}</span>`)
-      .join('');
-    fraseEl.style.opacity = '0.45';
+  clearTimeout(fraseTimeout);
+  fraseTimeout = setTimeout(() => {
+    const lineas = frases[fraseIndex % frases.length].split('\n');
+    fraseEl.innerHTML = lineas.map(l => `<span style="display:block">${l}</span>`).join('');
+    fraseEl.style.opacity = '0.42';
     fraseIndex++;
-  }, 600);
+  }, 500);
 }
 
 /* ============================
    AUDIO
 ============================ */
-const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-function playOceanSound(x,y){
-  if(audioCtx.state==='suspended') audioCtx.resume();
+function playOceanSound() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
   const now = audioCtx.currentTime;
-  const pitch = 110 + Math.random()*90;
-
+  const pitch = 95 + Math.random() * 85;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   const filter = audioCtx.createBiquadFilter();
-  osc.type='sine';
-  osc.frequency.setValueAtTime(pitch,now);
-  filter.type='lowpass';
-  filter.frequency.value=480;
-  gain.gain.setValueAtTime(0,now);
-  gain.gain.linearRampToValueAtTime(0.028,now+0.025);
-  gain.gain.exponentialRampToValueAtTime(0.0001,now+2);
-  osc.connect(filter);filter.connect(gain);gain.connect(audioCtx.destination);
-  osc.start(now);osc.stop(now+2);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(pitch, now);
+  filter.type = 'lowpass'; filter.frequency.value = 460;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.025, now + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+  osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + 2.2);
 
-  const osc2=audioCtx.createOscillator();
-  const gain2=audioCtx.createGain();
-  osc2.type='triangle';
-  osc2.frequency.value=pitch*0.502;
-  gain2.gain.setValueAtTime(0,now);
-  gain2.gain.linearRampToValueAtTime(0.012,now+0.18);
-  gain2.gain.exponentialRampToValueAtTime(0.0001,now+3.2);
-  osc2.connect(gain2);gain2.connect(audioCtx.destination);
-  osc2.start(now);osc2.stop(now+3.2);
+  const osc2 = audioCtx.createOscillator();
+  const gain2 = audioCtx.createGain();
+  osc2.type = 'triangle'; osc2.frequency.value = pitch * 0.5;
+  gain2.gain.setValueAtTime(0, now);
+  gain2.gain.linearRampToValueAtTime(0.01, now + 0.2);
+  gain2.gain.exponentialRampToValueAtTime(0.0001, now + 3.5);
+  osc2.connect(gain2); gain2.connect(audioCtx.destination);
+  osc2.start(now); osc2.stop(now + 3.5);
 }
 
-function whaleSound(){
-  if(audioCtx.state==='suspended') return;
-  const now=audioCtx.currentTime;
-  const osc=audioCtx.createOscillator();
-  const gain=audioCtx.createGain();
-  osc.type='sine';
-  osc.frequency.setValueAtTime(75,now);
-  osc.frequency.linearRampToValueAtTime(38,now+4.5);
-  gain.gain.setValueAtTime(0,now);
-  gain.gain.linearRampToValueAtTime(0.009,now+1.2);
-  gain.gain.exponentialRampToValueAtTime(0.0001,now+5.5);
-  osc.connect(gain);gain.connect(audioCtx.destination);
-  osc.start(now);osc.stop(now+5.5);
+function whaleSound() {
+  if (audioCtx.state === 'suspended') return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(72, now);
+  osc.frequency.linearRampToValueAtTime(35, now + 5);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.008, now + 1.5);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 6);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + 6);
 }
-
-setInterval(()=>{ if(Math.random()>0.6) whaleSound(); },20000);
+setInterval(() => { if (Math.random() > 0.6) whaleSound(); }, 22000);
 
 /* ============================
    RESIZE
 ============================ */
-function resize(){
-  w=canvas.width=window.innerWidth;
-  h=canvas.height=window.innerHeight;
+function resize() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
 }
-window.addEventListener('resize',resize);
+window.addEventListener('resize', resize);
 resize();
 
 /* ============================
    ONDAS
 ============================ */
-const ripples=[];
+const ripples = [];
+let lastRippleTime = 0;
+const RIPPLE_THROTTLE = 40; // ms entre ondas durante arrastre
 
-function crearOnda(x,y){
+function crearOnda(x, y, fromDrag) {
+  const ahora = Date.now();
+  if (fromDrag && ahora - lastRippleTime < RIPPLE_THROTTLE) return;
+  lastRippleTime = ahora;
+
   interactions++;
-  if(interactions===1){
-    indicacionEl.style.opacity='0';
-  }
-  // nueva frase cada 5 interacciones
-  if(interactions===5 || (interactions>5 && (interactions-5)%8===0)){
+  if (interactions === 1) indicacionEl.style.opacity = '0';
+
+  // frases: primera a los 4 toques, luego cada 6 interacciones
+  if (interactions === 4 || (interactions > 4 && (interactions - 4) % 6 === 0)) {
     mostrarFrase();
   }
-  ripples.push({x,y,radius:0,alpha:0.9,speed:1.8+Math.random()*0.8});
-  // segunda onda pequeña desfasada
-  setTimeout(()=>{
-    ripples.push({x,y,radius:0,alpha:0.45,speed:1.4+Math.random()*0.5});
-  },180);
-  playOceanSound(x,y);
+
+  ripples.push({ x, y, radius: 0, alpha: 0.85, speed: 1.6 + Math.random() * 1.0 });
+  setTimeout(() => {
+    ripples.push({ x, y, radius: 0, alpha: 0.38, speed: 1.2 + Math.random() * 0.6 });
+  }, 200);
+
+  // sonido solo en toques, no en cada frame de arrastre
+  if (!fromDrag) playOceanSound();
 }
 
-canvas.addEventListener('click',e=>{
-  const r=canvas.getBoundingClientRect();
-  crearOnda(e.clientX-r.left,e.clientY-r.top);
+/* ── Desktop: click Y arrastre con botón ── */
+canvas.addEventListener('click', e => {
+  const r = canvas.getBoundingClientRect();
+  crearOnda(e.clientX - r.left, e.clientY - r.top, false);
 });
-canvas.addEventListener('touchstart',e=>{
+let mouseDown = false;
+canvas.addEventListener('mousedown', () => mouseDown = true);
+window.addEventListener('mouseup', () => mouseDown = false);
+canvas.addEventListener('mousemove', e => {
+  if (!mouseDown) return;
+  const r = canvas.getBoundingClientRect();
+  crearOnda(e.clientX - r.left, e.clientY - r.top, true);
+});
+
+/* ── Mobile: touch ── */
+canvas.addEventListener('touchstart', e => {
   e.preventDefault();
-  const r=canvas.getBoundingClientRect();
-  crearOnda(e.touches[0].clientX-r.left,e.touches[0].clientY-r.top);
-},{passive:false});
-canvas.addEventListener('touchmove',e=>{
+  const r = canvas.getBoundingClientRect();
+  crearOnda(e.touches[0].clientX - r.left, e.touches[0].clientY - r.top, false);
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
   e.preventDefault();
-  const r=canvas.getBoundingClientRect();
-  crearOnda(e.touches[0].clientX-r.left,e.touches[0].clientY-r.top);
-},{passive:false});
+  const r = canvas.getBoundingClientRect();
+  crearOnda(e.touches[0].clientX - r.left, e.touches[0].clientY - r.top, true);
+}, { passive: false });
 
 /* ============================
    CRIATURAS ORGÁNICAS
 ============================ */
 class Criatura {
-  constructor(){
-    this.reset(true);
-  }
-  reset(init){
-    this.x = Math.random()*w;
-    this.y = init ? Math.random()*h : (Math.random()<0.5 ? -30 : h+30);
-    this.baseSpeed = Math.random()*0.35+0.08;
-    this.angle = Math.random()*Math.PI*2;
+  constructor() { this.reset(true); }
+  reset(init) {
+    this.x = Math.random() * (w || window.innerWidth);
+    this.y = init ? Math.random() * (h || window.innerHeight) : (h || window.innerHeight) + 30;
+    this.baseSpeed = Math.random() * 0.3 + 0.07;
+    this.angle = Math.random() * Math.PI * 2;
     this.targetAngle = this.angle;
     this.speed = this.baseSpeed;
-    this.segments = Math.floor(Math.random()*4)+5; // 5-8 segmentos
-    this.segLen = Math.random()*7+5;
-    this.thickness = Math.random()*1.8+0.6;
-    this.opacity = Math.random()*0.22+0.08;
-    this.wave = Math.random()*Math.PI*2;
-    this.waveSpeed = Math.random()*0.025+0.01;
-    this.waveAmp = Math.random()*0.55+0.2;
+    this.segments = Math.floor(Math.random() * 5) + 5;
+    this.segLen = Math.random() * 7 + 5;
+    this.thickness = Math.random() * 1.9 + 0.5;
+    this.opacity = Math.random() * 0.2 + 0.06;
+    this.wave = Math.random() * Math.PI * 2;
+    this.waveSpeed = Math.random() * 0.022 + 0.008;
+    this.waveAmp = Math.random() * 0.6 + 0.18;
     this.scared = false;
     this.scaredTimer = 0;
-    this.attraction = Math.random()*0.6+0.2;
-    // historial de posiciones para el cuerpo
+    this.attraction = Math.random() * 0.7 + 0.2;
+    // bioluminiscencia: algunas criaturas brillan más
+    this.biolum = Math.random() < 0.3;
+    this.glowPhase = Math.random() * Math.PI * 2;
     this.history = [];
-    for(let i=0;i<this.segments+1;i++){
-      this.history.push({x:this.x, y:this.y});
-    }
+    for (let i = 0; i < this.segments + 1; i++) this.history.push({ x: this.x, y: this.y });
   }
-  update(){
+  update() {
     this.wave += this.waveSpeed;
+    this.glowPhase += 0.018;
 
-    // reaccion a ondas
-    this.scared = false;
-    ripples.forEach(r=>{
-      const dx=r.x-this.x, dy=r.y-this.y;
-      const dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<200 && dist>0){
-        const force=(200-dist)/200;
-        if(dist<r.radius+20 && dist>r.radius-20){
-          // la onda los toca — huyen brevemente
-          this.targetAngle = Math.atan2(-dy,-dx)+( Math.random()-0.5)*1.2;
-          this.speed = this.baseSpeed*3.5;
-          this.scared=true;
-          this.scaredTimer=60;
-        } else if(!this.scared){
-          // atracción lenta hacia el origen de la onda
-          const attract = Math.atan2(dy,dx);
-          this.targetAngle += (attract - this.targetAngle)*0.004*force*this.attraction;
+    ripples.forEach(r => {
+      const dx = r.x - this.x, dy = r.y - this.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 200 && dist > 0) {
+        const force = (200 - dist) / 200;
+        if (dist < r.radius + 22 && dist > r.radius - 22) {
+          this.targetAngle = Math.atan2(-dy, -dx) + (Math.random() - 0.5) * 1.4;
+          this.speed = this.baseSpeed * 4;
+          this.scared = true; this.scaredTimer = 70;
+        } else if (!this.scared) {
+          const attract = Math.atan2(dy, dx);
+          this.targetAngle += (attract - this.targetAngle) * 0.003 * force * this.attraction;
         }
       }
     });
 
-    if(this.scaredTimer>0){
+    if (this.scaredTimer > 0) {
       this.scaredTimer--;
-      if(this.scaredTimer===0) this.speed=this.baseSpeed;
+      if (this.scaredTimer === 0) this.speed = this.baseSpeed;
     }
 
-    // giro suave hacia targetAngle
     let diff = this.targetAngle - this.angle;
-    while(diff>Math.PI) diff-=Math.PI*2;
-    while(diff<-Math.PI) diff+=Math.PI*2;
-    this.angle += diff*0.04;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    this.angle += diff * 0.035;
 
-    // movimiento con ondulación natural
-    const nx = this.x + Math.cos(this.angle)*this.speed;
-    const ny = this.y + Math.sin(this.angle)*this.speed;
+    this.x += Math.cos(this.angle) * this.speed;
+    this.y += Math.sin(this.angle) * this.speed;
 
-    // deriva aleatoria suave
-    if(!this.scared && Math.random()<0.015){
-      this.targetAngle += (Math.random()-0.5)*1.0;
-    }
+    if (!this.scared && Math.random() < 0.012) this.targetAngle += (Math.random() - 0.5) * 0.9;
 
-    this.x = nx;
-    this.y = ny;
+    const m = 50;
+    if (this.x < m) this.targetAngle += 0.07;
+    if (this.x > w - m) this.targetAngle -= 0.07;
+    if (this.y < m) this.targetAngle += 0.07;
+    if (this.y > h - m) this.targetAngle -= 0.07;
 
-    // rebote suave en bordes
-    const margin=40;
-    if(this.x<margin) this.targetAngle += 0.08;
-    if(this.x>w-margin) this.targetAngle -= 0.08;
-    if(this.y<margin) this.targetAngle += 0.08;
-    if(this.y>h-margin) this.targetAngle -= 0.08;
-
-    // historial para el cuerpo ondulante
-    this.history.unshift({x:this.x, y:this.y});
-    if(this.history.length>this.segments+1) this.history.pop();
+    this.history.unshift({ x: this.x, y: this.y });
+    if (this.history.length > this.segments + 1) this.history.pop();
   }
-
-  draw(){
-    if(this.history.length<2) return;
-
+  draw() {
+    if (this.history.length < 2) return;
     ctx.save();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = `rgba(100,210,230,${this.opacity*0.5})`;
+    const glowIntensity = this.biolum ? (0.5 + 0.5 * Math.sin(this.glowPhase)) : 0.3;
+    ctx.shadowBlur = this.biolum ? 18 * glowIntensity : 8;
+    ctx.shadowColor = `rgba(100,220,240,${this.opacity * glowIntensity})`;
 
-    for(let i=0;i<this.history.length-1;i++){
-      const p1=this.history[i];
-      const p2=this.history[i+1];
-      const t=i/(this.history.length-1);
-
-      // ondulación lateral del cuerpo
-      const waveOffset = Math.sin(this.wave - i*0.7)*this.waveAmp*(1-t*0.5);
-      const perpX=-Math.sin(this.angle)*waveOffset;
-      const perpY= Math.cos(this.angle)*waveOffset;
-
-      const x1=p1.x+perpX*(1-t);
-      const y1=p1.y+perpY*(1-t);
-      const x2=p2.x+perpX*(1-t)*0.85;
-      const y2=p2.y+perpY*(1-t)*0.85;
-
-      // grosor que adelgaza hacia la cola
-      const thick = this.thickness*(1-t*0.75);
-      const alpha = this.opacity*(1-t*0.6);
-
+    for (let i = 0; i < this.history.length - 1; i++) {
+      const p1 = this.history[i];
+      const p2 = this.history[i + 1];
+      const t = i / (this.history.length - 1);
+      const waveOffset = Math.sin(this.wave - i * 0.65) * this.waveAmp * (1 - t * 0.5);
+      const perpX = -Math.sin(this.angle) * waveOffset;
+      const perpY = Math.cos(this.angle) * waveOffset;
+      const x1 = p1.x + perpX * (1 - t);
+      const y1 = p1.y + perpY * (1 - t);
+      const x2 = p2.x + perpX * (1 - t) * 0.82;
+      const y2 = p2.y + perpY * (1 - t) * 0.82;
+      const thick = this.thickness * (1 - t * 0.78);
+      const alpha = this.opacity * (1 - t * 0.55) * (this.biolum ? (0.7 + 0.3 * glowIntensity) : 1);
       ctx.beginPath();
-      ctx.moveTo(x1,y1);
-      ctx.lineTo(x2,y2);
-      ctx.strokeStyle=`rgba(100,210,230,${alpha})`;
-      ctx.lineWidth=thick;
-      ctx.lineCap='round';
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.strokeStyle = `rgba(100,215,235,${alpha})`;
+      ctx.lineWidth = thick; ctx.lineCap = 'round';
       ctx.stroke();
     }
-
-    // cabeza — punto luminoso
+    // cabeza
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.thickness*0.8, 0, Math.PI*2);
-    ctx.fillStyle=`rgba(140,225,240,${this.opacity*1.4})`;
+    ctx.arc(this.x, this.y, this.thickness * 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(150,230,245,${this.opacity * 1.5})`;
     ctx.fill();
-
     ctx.restore();
   }
 }
 
-const criaturas=[];
-for(let i=0;i<28;i++) criaturas.push(new Criatura());
+/* ============================
+   PLANTAS / ALGAS DE FONDO
+============================ */
+class Alga {
+  constructor() {
+    this.x = Math.random() * (w || window.innerWidth);
+    this.y = (h || window.innerHeight) * (0.7 + Math.random() * 0.35);
+    this.segments = Math.floor(Math.random() * 5) + 4;
+    this.segH = Math.random() * 12 + 8;
+    this.sway = Math.random() * Math.PI * 2;
+    this.swaySpeed = Math.random() * 0.008 + 0.003;
+    this.swayAmp = Math.random() * 18 + 8;
+    this.thickness = Math.random() * 1.4 + 0.4;
+    this.opacity = Math.random() * 0.12 + 0.04;
+    this.color = Math.random() < 0.5
+      ? `rgba(60,180,140,`
+      : `rgba(80,160,200,`;
+  }
+  update() { this.sway += this.swaySpeed; }
+  draw() {
+    ctx.save();
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = `rgba(60,200,160,0.1)`;
+    let px = this.x, py = this.y;
+    for (let i = 0; i < this.segments; i++) {
+      const t = i / this.segments;
+      const swayX = Math.sin(this.sway + i * 0.6) * this.swayAmp * t;
+      const nx = this.x + swayX;
+      const ny = this.y - i * this.segH;
+      ctx.beginPath();
+      ctx.moveTo(px, py); ctx.lineTo(nx, ny);
+      ctx.strokeStyle = `${this.color}${this.opacity * (1 - t * 0.4)})`;
+      ctx.lineWidth = this.thickness * (1 - t * 0.7);
+      ctx.lineCap = 'round'; ctx.stroke();
+      px = nx; py = ny;
+    }
+    ctx.restore();
+  }
+}
+
+const criaturas = [];
+for (let i = 0; i < 30; i++) criaturas.push(new Criatura());
+
+const algas = [];
+// crear algas después de conocer w y h
+function initAlgas() {
+  algas.length = 0;
+  for (let i = 0; i < 22; i++) algas.push(new Alga());
+}
+initAlgas();
+window.addEventListener('resize', initAlgas);
+
+/* ============================
+   PARTÍCULAS BIOLUMINISCENTES
+============================ */
+class Biolum {
+  constructor() { this.reset(true); }
+  reset(init) {
+    this.x = Math.random() * (w || window.innerWidth);
+    this.y = init ? Math.random() * (h || window.innerHeight) : (h || window.innerHeight) + 5;
+    this.vy = -(Math.random() * 0.18 + 0.04);
+    this.vx = (Math.random() - 0.5) * 0.08;
+    this.r = Math.random() * 1.8 + 0.3;
+    this.baseOpacity = Math.random() * 0.18 + 0.04;
+    this.opacity = this.baseOpacity;
+    this.phase = Math.random() * Math.PI * 2;
+    this.phaseSpeed = Math.random() * 0.04 + 0.01;
+    this.wobble = Math.random() * Math.PI * 2;
+    this.wobbleSpeed = Math.random() * 0.015 + 0.005;
+  }
+  update() {
+    this.phase += this.phaseSpeed;
+    this.wobble += this.wobbleSpeed;
+    this.opacity = this.baseOpacity * (0.5 + 0.5 * Math.sin(this.phase));
+    this.x += this.vx + Math.sin(this.wobble) * 0.15;
+    this.y += this.vy;
+    if (this.y < -8) this.reset(false);
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(120,230,255,${this.opacity})`;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = `rgba(100,220,255,${this.opacity * 0.8})`;
+    ctx.fill();
+  }
+}
+
+const biolums = [];
+for (let i = 0; i < 70; i++) biolums.push(new Biolum());
 
 /* ============================
    LOOP
 ============================ */
-function animate(){
+function animate() {
   requestAnimationFrame(animate);
-  ctx.clearRect(0,0,w,h);
+  ctx.clearRect(0, 0, w, h);
 
-  // fondo gradiente
-  const grad=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w*0.85);
-  grad.addColorStop(0,'rgba(8,18,28,0.18)');
-  grad.addColorStop(1,'rgba(0,0,0,1)');
-  ctx.fillStyle=grad;
-  ctx.fillRect(0,0,w,h);
+  // Fondo: gradiente de profundidad oceánica
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#010d14');
+  grad.addColorStop(0.4, '#020f18');
+  grad.addColorStop(0.75, '#010b12');
+  grad.addColorStop(1, '#000608');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
 
-  // partículas de fondo
-  const t=performance.now()*0.0001;
-  for(let i=0;i<60;i++){
-    const px=((i*173+t*8)%1)*w;
-    const py=((i*97+t*4)%1)*h;
-    ctx.fillStyle='rgba(255,255,255,0.018)';
-    ctx.beginPath();
-    ctx.arc(px,py,0.9,0,Math.PI*2);
-    ctx.fill();
-  }
+  // Velo de profundidad — más oscuro abajo
+  const velo = ctx.createLinearGradient(0, h * 0.5, 0, h);
+  velo.addColorStop(0, 'rgba(0,0,0,0)');
+  velo.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = velo;
+  ctx.fillRect(0, 0, w, h);
 
-  // ondas — con intersección
-  ripples.forEach((r,i)=>{
-    r.radius+=r.speed;
-    r.alpha-=0.003;
+  // Luz desde arriba — como si el sol llegara desde la superficie
+  const luz = ctx.createRadialGradient(w * 0.5, -h * 0.1, 0, w * 0.5, h * 0.3, w * 0.7);
+  luz.addColorStop(0, 'rgba(40,100,140,0.07)');
+  luz.addColorStop(0.5, 'rgba(20,60,100,0.03)');
+  luz.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = luz;
+  ctx.fillRect(0, 0, w, h);
 
-    // intersección con otras ondas
-    ripples.forEach((r2,j)=>{
-      if(i===j) return;
-      const dx=r.x-r2.x, dy=r.y-r2.y;
-      const dist=Math.sqrt(dx*dx+dy*dy);
-      if(Math.abs(r.radius+r2.radius-dist)<6){
-        // destello en punto de intersección
-        const ix=r.x+(r2.x-r.x)*0.5;
-        const iy=r.y+(r2.y-r.y)*0.5;
+  // Algas de fondo
+  algas.forEach(a => { a.update(); a.draw(); });
+
+  // Bioluminiscencia
+  ctx.save();
+  biolums.forEach(b => { b.update(); b.draw(); });
+  ctx.restore();
+
+  // Ondas con intersección
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i];
+    r.radius += r.speed;
+    r.alpha -= 0.0028;
+
+    // destello en intersecciones
+    for (let j = i + 1; j < ripples.length; j++) {
+      const r2 = ripples[j];
+      const dx = r.x - r2.x, dy = r.y - r2.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (Math.abs(r.radius + r2.radius - dist) < 8) {
+        const ix = (r.x * r2.radius + r2.x * r.radius) / (r.radius + r2.radius);
+        const iy = (r.y * r2.radius + r2.y * r.radius) / (r.radius + r2.radius);
         ctx.beginPath();
-        ctx.arc(ix,iy,3,0,Math.PI*2);
-        ctx.fillStyle=`rgba(180,240,255,${r.alpha*0.4})`;
+        ctx.arc(ix, iy, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(180,245,255,${Math.min(r.alpha, r2.alpha) * 0.5})`;
         ctx.fill();
       }
-    });
+    }
 
     ctx.beginPath();
-    ctx.arc(r.x,r.y,r.radius,0,Math.PI*2);
-    ctx.strokeStyle=`rgba(100,210,230,${r.alpha*0.3})`;
-    ctx.lineWidth=1.2;
-    ctx.stroke();
-  });
+    ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(100,210,230,${r.alpha * 0.28})`;
+    ctx.lineWidth = 1.2; ctx.stroke();
 
-  // limpiar ondas muertas
-  for(let i=ripples.length-1;i>=0;i--){
-    if(ripples[i].alpha<=0) ripples.splice(i,1);
+    if (r.alpha <= 0) ripples.splice(i, 1);
   }
 
-  // criaturas
-  criaturas.forEach(c=>{c.update();c.draw();});
+  // Criaturas
+  criaturas.forEach(c => { c.update(); c.draw(); });
 }
 
 animate();
